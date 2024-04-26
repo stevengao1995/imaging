@@ -82,6 +82,7 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 	done := make(chan struct{})
 
 	defer close(done)
+
 	orient = readOrientation(pr)
 	io.Copy(ioutil.Discard, pr)
 
