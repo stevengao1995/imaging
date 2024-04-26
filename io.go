@@ -3,6 +3,7 @@ package imaging
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/mdouchement/dng"
 	"image"
 	"image/draw"
 	"image/gif"
@@ -32,6 +33,7 @@ var fs fileSystem = localFS{}
 
 type decodeConfig struct {
 	autoOrientation bool
+	isDng           bool
 }
 
 var defaultDecodeConfig = decodeConfig{
@@ -50,15 +52,27 @@ func AutoOrientation(enabled bool) DecodeOption {
 	}
 }
 
+func IsDng(enabled bool) DecodeOption {
+	return func(c *decodeConfig) {
+		c.isDng = enabled
+	}
+}
+
 // Decode reads an image from r.
 func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
+	var img image.Image
+	var err error
 	cfg := defaultDecodeConfig
 	for _, option := range opts {
 		option(&cfg)
 	}
 
 	if !cfg.autoOrientation {
-		img, _, err := image.Decode(r)
+		if cfg.isDng {
+			img, err = dng.Decode(r)
+		} else {
+			img, _, err = image.Decode(r)
+		}
 		return img, err
 	}
 
@@ -71,8 +85,11 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 		orient = readOrientation(pr)
 		io.Copy(ioutil.Discard, pr)
 	}()
-
-	img, _, err := image.Decode(r)
+	if cfg.isDng {
+		img, err = dng.Decode(r)
+	} else {
+		img, _, err = image.Decode(r)
+	}
 	pw.Close()
 	<-done
 	if err != nil {
@@ -91,7 +108,6 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 //
 //	// Load an image and transform it depending on the EXIF orientation tag (if present).
 //	img, err := imaging.Open("test.jpg", imaging.AutoOrientation(true))
-//
 func Open(filename string, opts ...DecodeOption) (image.Image, error) {
 	file, err := fs.Open(filename)
 	if err != nil {
@@ -264,7 +280,6 @@ func Encode(w io.Writer, img image.Image, format Format, opts ...EncodeOption) e
 //
 //	// Save the image as JPEG with optional quality parameter set to 80.
 //	err := imaging.Save(img, "out.jpg", imaging.JPEGQuality(80))
-//
 func Save(img image.Image, filename string, opts ...EncodeOption) (err error) {
 	f, err := FormatFromFilename(filename)
 	if err != nil {
