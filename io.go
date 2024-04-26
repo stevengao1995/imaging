@@ -80,11 +80,11 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 	pr, pw := io.Pipe()
 	r = io.TeeReader(r, pw)
 	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		orient = readOrientation(pr)
-		io.Copy(ioutil.Discard, pr)
-	}()
+
+	defer close(done)
+	orient = readOrientation(pr)
+	io.Copy(ioutil.Discard, pr)
+
 	if cfg.isDng {
 		img, err = dng.Decode(r)
 	} else {
